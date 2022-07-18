@@ -54,7 +54,7 @@ fn visit_dirs(dir: PathBuf, section: &mut Section) -> anyhow::Result<()> {
     }
 
     let client = reqwest::blocking::Client::new();
-    let github_token = std::env::var("GITHUB_TOKEN")?;
+    let github_token = std::env::var("GITHUB_TOKEN");
 
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
@@ -105,16 +105,18 @@ fn visit_dirs(dir: PathBuf, section: &mut Section) -> anyhow::Result<()> {
             let url = url::Url::parse(&asset.link)?;
             match url.host_str() {
                 Some("github.com") => {
-                    let segments = url.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap();
-                    let username = segments[0];
-                    let repository_name = segments[1];
-                    get_metadata_from_github(
-                        username,
-                        repository_name,
-                        &mut asset,
-                        &client,
-                        &github_token,
-                    )?;
+                    if let Ok(github_token) = &github_token {
+                        let segments = url.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap();
+                        let username = segments[0];
+                        let repository_name = segments[1];
+                        get_metadata_from_github(
+                            username,
+                            repository_name,
+                            &mut asset,
+                            &client,
+                            github_token,
+                        )?;
+                    }
                 }
                 Some("crates.io") => {
                     // TODO get crates.io metadata from <https://github.com/alyti/cratesio-dbdump-lookup>
