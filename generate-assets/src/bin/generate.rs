@@ -8,13 +8,15 @@ use std::{
 
 use generate_assets::*;
 
-fn main() -> io::Result<()> {
+fn main() -> anyhow::Result<()> {
     let asset_dir = std::env::args().nth(1).unwrap();
     let content_dir = std::env::args().nth(2).unwrap();
     let _ = fs::create_dir(content_dir.clone());
     let asset_root_section = parse_assets(&asset_dir)?;
 
-    asset_root_section.write(Path::new(&content_dir), Path::new(""), 0)?;
+    asset_root_section
+        .write(Path::new(&content_dir), Path::new(""), 0)
+        .expect("Failed to write assets section");
     Ok(())
 }
 
@@ -34,6 +36,8 @@ struct FrontMatterAsset {
 struct FrontMatterAssetExtra {
     link: String,
     image: Option<String>,
+    licenses: Option<Vec<String>>,
+    bevy_versions: Option<Vec<String>>,
 }
 
 impl From<&Asset> for FrontMatterAsset {
@@ -45,6 +49,8 @@ impl From<&Asset> for FrontMatterAsset {
             extra: FrontMatterAssetExtra {
                 link: asset.link.clone(),
                 image: asset.image.clone(),
+                licenses: asset.licenses.clone(),
+                bevy_versions: asset.bevy_versions.clone(),
             },
         }
     }
@@ -72,10 +78,16 @@ impl FrontMatterWriter for Asset {
             let _ = fs::copy(original_image, image_file_path);
         }
 
-        let mut file = File::create(path.join(format!(
+        let formatted_path = path.join(format!(
             "{}.md",
-            self.name.to_ascii_lowercase().replace("/", "-")
-        )))?;
+            self.name
+                .to_ascii_lowercase()
+                .replace('/', "-")
+                .replace(|c: char| !c.is_ascii_alphanumeric(), "")
+        ));
+
+        let mut file = File::create(formatted_path.clone())
+            .unwrap_or_else(|err| panic!("Failed to create file at {:?}\n{}", formatted_path, err));
         file.write_all(
             format!(
                 r#"+++
@@ -85,7 +97,8 @@ impl FrontMatterWriter for Asset {
                 toml::to_string(&frontmatter).unwrap(),
             )
             .as_bytes(),
-        )?;
+        )
+        .unwrap_or_else(|err| panic!("Failed to write at {:?}\n{}", formatted_path, err));
 
         Ok(())
     }
@@ -140,20 +153,24 @@ impl FrontMatterWriter for Section {
     fn write(&self, root_path: &Path, current_path: &Path, weight: usize) -> io::Result<()> {
         let section_path = current_path.join(self.name.to_ascii_lowercase());
         let path = root_path.join(&section_path);
-        fs::create_dir(path.clone())?;
+        if !path.exists() {
+            fs::create_dir(path.clone())
+                .unwrap_or_else(|_| panic!("Failed to create dir {:?}", path));
+        }
 
         let mut frontmatter = FrontMatterSection::from(self);
         if self.order.is_none() {
             frontmatter.weight = weight;
         }
 
-        let mut file = File::create(path.join("_index.md"))?;
+        let mut file = File::create(path.join("_index.md"))
+            .unwrap_or_else(|_| panic!("Failed to create _index.md at {:?}", path));
         file.write_all(
             format!(
                 r#"+++
-{}
-+++
-"#,
+                    {}
+                    +++
+                "#,
                 toml::to_string(&frontmatter).unwrap(),
             )
             .as_bytes(),

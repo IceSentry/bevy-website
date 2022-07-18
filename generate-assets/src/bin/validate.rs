@@ -76,7 +76,7 @@ impl AssetValidator for Asset {
             }
         }
 
-        return valid;
+        valid
     }
 }
 
@@ -92,5 +92,5 @@ fn has_forbidden_formatting(string: &str) -> bool {
         return true;
     }
 
-    return false;
+    false
 }
