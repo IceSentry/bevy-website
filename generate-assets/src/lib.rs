@@ -154,6 +154,12 @@ fn get_extra_metadata(
 ) -> anyhow::Result<()> {
     println!("Getting extra metadata for {}", asset.name);
 
+    // TODO
+    // If the url isn't to crates.io we should probably try to query it first anyway.
+    // This would make it spam github and gitlab apis a bit less.
+    // This would make it possible to get more metadata like download count
+    // This should only be done for things in the Assets/ section since the other section aren't typically crates
+
     let url = url::Url::parse(&asset.link)?;
     let segments = url.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap();
     match url.host_str() {
@@ -178,6 +184,9 @@ fn get_extra_metadata(
                     eprintln!("ERROR: {err}")
                 }
             }
+        }
+        Some("gitlab.com") => {
+            // TODO
         }
         _ => {}
     }

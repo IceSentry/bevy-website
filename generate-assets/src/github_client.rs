@@ -1,4 +1,4 @@
-use anyhow::{bail, Context};
+use anyhow::bail;
 use reqwest::header::{ACCEPT, USER_AGENT};
 use serde::Deserialize;
 
