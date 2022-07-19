@@ -49,82 +49,83 @@ impl AssetNode {
 }
 
 fn visit_dirs(dir: PathBuf, section: &mut Section) -> anyhow::Result<()> {
-    if !dir.is_dir() {
-        return Ok(());
-    }
+    if dir.is_dir() {
+        let client = reqwest::blocking::Client::new();
+        let github_token = std::env::var("GITHUB_TOKEN");
 
-    let client = reqwest::blocking::Client::new();
-    let github_token = std::env::var("GITHUB_TOKEN");
-
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.file_name().unwrap() == ".git" || path.file_name().unwrap() == ".github" {
-            continue;
-        }
-        if path.is_dir() {
-            let folder = path.file_name().unwrap();
-            let (order, sort_order_reversed) = if path.join("_category.toml").exists() {
-                let from_file: toml::Value =
-                    toml::de::from_str(&fs::read_to_string(path.join("_category.toml")).unwrap())
-                        .unwrap();
-                (
-                    from_file
-                        .get("order")
-                        .and_then(|v| v.as_integer())
-                        .map(|v| v as usize),
-                    from_file
-                        .get("sort_order_reversed")
-                        .and_then(|v| v.as_bool())
-                        .unwrap_or(false),
-                )
-            } else {
-                (None, false)
-            };
-            let mut new_section = Section {
-                name: folder.to_str().unwrap().to_string(),
-                content: vec![],
-                template: None,
-                header: None,
-                order,
-                sort_order_reversed,
-            };
-            visit_dirs(path.clone(), &mut new_section)?;
-            section.content.push(AssetNode::Section(new_section));
-        } else {
-            if path.file_name().unwrap() == "_category.toml"
-                || path.extension().expect("file must have an extension") != "toml"
-            {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.file_name().unwrap() == ".git" || path.file_name().unwrap() == ".github" {
                 continue;
             }
-            let mut asset: Asset = toml::de::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
-            asset.original_path = Some(path);
+            if path.is_dir() {
+                let folder = path.file_name().unwrap();
+                let (order, sort_order_reversed) = if path.join("_category.toml").exists() {
+                    let from_file: toml::Value = toml::de::from_str(
+                        &fs::read_to_string(path.join("_category.toml")).unwrap(),
+                    )
+                    .unwrap();
+                    (
+                        from_file
+                            .get("order")
+                            .and_then(|v| v.as_integer())
+                            .map(|v| v as usize),
+                        from_file
+                            .get("sort_order_reversed")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false),
+                    )
+                } else {
+                    (None, false)
+                };
+                let mut new_section = Section {
+                    name: folder.to_str().unwrap().to_string(),
+                    content: vec![],
+                    template: None,
+                    header: None,
+                    order,
+                    sort_order_reversed,
+                };
+                visit_dirs(path.clone(), &mut new_section)?;
+                section.content.push(AssetNode::Section(new_section));
+            } else {
+                if path.file_name().unwrap() == "_category.toml"
+                    || path.extension().expect("file must have an extension") != "toml"
+                {
+                    continue;
+                }
+                let mut asset: Asset =
+                    toml::de::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+                asset.original_path = Some(path);
 
-            println!("Getting extra metadata for {}", asset.name);
+                println!("Getting extra metadata for {}", asset.name);
 
-            let url = url::Url::parse(&asset.link)?;
-            match url.host_str() {
-                Some("github.com") => {
-                    if let Ok(github_token) = &github_token {
-                        let segments = url.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap();
-                        let username = segments[0];
-                        let repository_name = segments[1];
-                        get_metadata_from_github(
-                            username,
-                            repository_name,
-                            &mut asset,
-                            &client,
-                            github_token,
-                        )?;
+                let url = url::Url::parse(&asset.link)?;
+                match url.host_str() {
+                    Some("github.com") => {
+                        if let Ok(github_token) = &github_token {
+                            let segments =
+                                url.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap();
+                            let username = segments[0];
+                            let repository_name = segments[1];
+                            get_metadata_from_github(
+                                username,
+                                repository_name,
+                                &mut asset,
+                                &client,
+                                github_token,
+                            )?;
+                        }
                     }
+                    Some("crates.io") => {
+                        // TODO get crates.io metadata from <https://github.com/alyti/cratesio-dbdump-lookup>
+                    }
+                    _ => {}
                 }
-                Some("crates.io") => {
-                    // TODO get crates.io metadata from <https://github.com/alyti/cratesio-dbdump-lookup>
-                }
-                _ => {}
-            }
 
-            section.content.push(AssetNode::Asset(asset));
+                section.content.push(AssetNode::Asset(asset));
+            }
         }
     }
     Ok(())
