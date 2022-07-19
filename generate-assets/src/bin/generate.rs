@@ -6,7 +6,7 @@ use std::{
     path::Path,
 };
 
-use generate_assets::*;
+use generate_assets::{github_client::GithubClient, *};
 
 fn main() -> anyhow::Result<()> {
     let asset_dir = std::env::args().nth(1).unwrap();
@@ -14,8 +14,17 @@ fn main() -> anyhow::Result<()> {
 
     let db = prepare_crates_db()?;
 
+    let github_client = {
+        // This should already be configured in CI, but it's not mandatory if running locally
+        if let Ok(token) = std::env::var("GITHUB_TOKEN") {
+            Some(GithubClient::new(token))
+        } else {
+            None
+        }
+    };
+
     let _ = fs::create_dir(content_dir.clone());
-    let asset_root_section = parse_assets(&asset_dir, Some(&db))?;
+    let asset_root_section = parse_assets(&asset_dir, Some(&db), github_client.as_ref())?;
 
     asset_root_section
         .write(Path::new(&content_dir), Path::new(""), 0)
