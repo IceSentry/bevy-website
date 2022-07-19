@@ -168,9 +168,9 @@ impl FrontMatterWriter for Section {
         file.write_all(
             format!(
                 r#"+++
-                    {}
-                    +++
-                "#,
+{}
++++
+"#,
                 toml::to_string(&frontmatter).unwrap(),
             )
             .as_bytes(),
