@@ -42,10 +42,8 @@ impl GithubClient {
 
         // The github rest api is supposed to return the content as a base64 encoded string
         if json.encoding == "base64" {
-            base64::decode(json.content.replace('\n', "").trim())
-                .ok()
-                .and_then(|data| String::from_utf8(data).ok())
-                .context("Failed to parse content")
+            let data = base64::decode(json.content.replace('\n', "").trim())?;
+            Ok(String::from_utf8(data)?)
         } else {
             bail!("Content is not in base64");
         }
