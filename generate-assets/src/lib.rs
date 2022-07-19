@@ -224,14 +224,7 @@ fn get_metadata_from_github(
         .context("Failed to get content from github")?;
 
     let cargo_manifest = toml::from_str::<cargo_toml::Manifest>(&content)?;
-
-    if let Some(license) = get_license(&cargo_manifest) {
-        asset.set_license(&license);
-    }
-
-    if let Some(version) = get_bevy_version(&cargo_manifest) {
-        asset.bevy_versions = Some(vec![version]);
-    }
+    get_metadata(&cargo_manifest, asset);
 
     Ok(())
 }
@@ -252,16 +245,23 @@ fn get_metadata_from_gitlab(
         .context("Failed to get Cargo.toml from gitlab")?;
 
     let cargo_manifest = toml::from_str::<cargo_toml::Manifest>(&content)?;
-
-    if let Some(license) = get_license(&cargo_manifest) {
-        asset.set_license(&license);
-    }
-
-    if let Some(version) = get_bevy_version(&cargo_manifest) {
-        asset.bevy_versions = Some(vec![version]);
-    }
+    get_metadata(&cargo_manifest, asset);
 
     Ok(())
+}
+
+fn get_metadata(cargo_manifest: &cargo_toml::Manifest, asset: &mut Asset) {
+    if asset.licenses.is_none() {
+        if let Some(license) = get_license(cargo_manifest) {
+            asset.set_license(&license);
+        }
+    }
+
+    if asset.bevy_versions.is_none() {
+        if let Some(version) = get_bevy_version(cargo_manifest) {
+            asset.bevy_versions = Some(vec![version]);
+        }
+    }
 }
 
 /// Gets the bevy version from the dependency list
