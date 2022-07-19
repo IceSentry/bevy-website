@@ -28,7 +28,7 @@ fn main() -> anyhow::Result<()> {
         if let Ok(token) = std::env::var("GITLAB_TOKEN") {
             Some(GitlabClient::new(token))
         } else {
-            None
+            Some(GitlabClient::new(String::from("")))
         }
     };
 
@@ -37,7 +37,7 @@ fn main() -> anyhow::Result<()> {
         &asset_dir,
         Some(&db),
         github_client.as_ref(),
-        Some(GitlabClient::new(String::from(""))).as_ref(),
+        gitlab_client.as_ref(),
     )?;
 
     asset_root_section

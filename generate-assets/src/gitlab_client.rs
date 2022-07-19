@@ -12,17 +12,20 @@ pub struct GitlabProjectSearchResult {
 
 pub struct GitlabClient {
     client: reqwest::blocking::Client,
-    token: String,
+    // This is not currently used because we have so few assets using gitlab that we don't need it.
+    _token: String,
 }
 
 impl GitlabClient {
     pub fn new(token: String) -> Self {
         Self {
             client: reqwest::blocking::Client::new(),
-            token,
+            _token: token,
         }
     }
 
+    /// Finds a list of repo based on their name
+    /// Useful to get the repo id and default_branch
     pub fn search_project_by_name(
         &self,
         repository_name: &str,

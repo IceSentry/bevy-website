@@ -170,7 +170,7 @@ fn get_extra_metadata(
     // If the url isn't to crates.io we should probably try to query it first anyway.
     // This would make it spam github and gitlab apis a bit less.
     // This would make it possible to get more metadata like download count
-    // This should only be done for things in the Assets/ section since the other section aren't typically crates
+    // This should only be done for things in the Assets/ section since the other sections aren't typically crates
 
     let url = url::Url::parse(&asset.link)?;
     let segments = url.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap();
@@ -225,32 +225,11 @@ fn get_metadata_from_github(
 
     let cargo_manifest = toml::from_str::<cargo_toml::Manifest>(&content)?;
 
-    // Get the license from the package information
-    let license = if let Some(cargo_toml::Package { license, .. }) = &cargo_manifest.package {
-        license.clone()
-    } else {
-        // If there's no license in the Cargo.toml, try to get it directly from the repo
-        client.get_license(username, repository_name).ok()
-    };
-
-    if let Some(license) = license {
+    if let Some(license) = get_license(&cargo_manifest) {
         asset.set_license(&license);
     }
 
-    // Find any dep that starts with bevy and get the version
-    // This makes sure to handle all the bevy_* crates
-    let version = cargo_manifest
-        .dependencies
-        .keys()
-        .find(|k| k.starts_with("bevy"))
-        .and_then(|key| {
-            cargo_manifest
-                .dependencies
-                .get(key)
-                .and_then(get_bevy_version)
-        });
-
-    if let Some(version) = version {
+    if let Some(version) = get_bevy_version(&cargo_manifest) {
         asset.bevy_versions = Some(vec![version]);
     }
 
@@ -274,34 +253,11 @@ fn get_metadata_from_gitlab(
 
     let cargo_manifest = toml::from_str::<cargo_toml::Manifest>(&content)?;
 
-    // Get the license from the package information
-    let license = if let Some(cargo_toml::Package { license, .. }) = &cargo_manifest.package {
-        license.clone()
-    } else {
-        // If there's no license in the Cargo.toml, try to get it directly from the repo
-        // TODO try to get license from crates.io otherwise
-        // try parsing the LICENSE file. The managed_license resource requires a gitlab ultimate license
-        None
-    };
-
-    if let Some(license) = license {
+    if let Some(license) = get_license(&cargo_manifest) {
         asset.set_license(&license);
     }
 
-    // Find any dep that starts with bevy and get the version
-    // This makes sure to handle all the bevy_* crates
-    let version = cargo_manifest
-        .dependencies
-        .keys()
-        .find(|k| k.starts_with("bevy"))
-        .and_then(|key| {
-            cargo_manifest
-                .dependencies
-                .get(key)
-                .and_then(get_bevy_version)
-        });
-
-    if let Some(version) = version {
+    if let Some(version) = get_bevy_version(&cargo_manifest) {
         asset.bevy_versions = Some(vec![version]);
     }
 
@@ -311,7 +267,7 @@ fn get_metadata_from_gitlab(
 /// Gets the bevy version from the dependency list
 /// Returns the version number if available.
 /// If is is a git dependency, return either "main" or "git" for anything that isn't "main".
-fn get_bevy_version(dep: &cargo_toml::Dependency) -> Option<String> {
+fn get_bevy_dependency_version(dep: &cargo_toml::Dependency) -> Option<String> {
     match dep {
         cargo_toml::Dependency::Simple(version) => Some(version.to_string()),
         cargo_toml::Dependency::Detailed(detail) => {
@@ -328,6 +284,41 @@ fn get_bevy_version(dep: &cargo_toml::Dependency) -> Option<String> {
             }
         }
     }
+}
+
+/// Gets the license from a Cargo.toml file
+/// Tries to emulate crates.io behaviour
+fn get_license(cargo_manifest: &cargo_toml::Manifest) -> Option<String> {
+    // Get the license from the package information
+    if let Some(cargo_toml::Package {
+        license,
+        license_file,
+        ..
+    }) = &cargo_manifest.package
+    {
+        if let Some(license) = license {
+            Some(license.clone())
+        } else {
+            license_file.as_ref().map(|_| String::from("non-standard"))
+        }
+    } else {
+        None
+    }
+}
+
+/// Find any dep that starts with bevy and get the version
+/// This makes sure to handle all the bevy_* crates
+fn get_bevy_version(cargo_manifest: &cargo_toml::Manifest) -> Option<String> {
+    cargo_manifest
+        .dependencies
+        .keys()
+        .find(|k| k.starts_with("bevy"))
+        .and_then(|key| {
+            cargo_manifest
+                .dependencies
+                .get(key)
+                .and_then(get_bevy_dependency_version)
+        })
 }
 
 /// Downloads the crates.io database dump and open a connection to the db
