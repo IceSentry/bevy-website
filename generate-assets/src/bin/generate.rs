@@ -11,8 +11,11 @@ use generate_assets::*;
 fn main() -> anyhow::Result<()> {
     let asset_dir = std::env::args().nth(1).unwrap();
     let content_dir = std::env::args().nth(2).unwrap();
+
+    let db = prepare_crates_db()?;
+
     let _ = fs::create_dir(content_dir.clone());
-    let asset_root_section = parse_assets(&asset_dir)?;
+    let asset_root_section = parse_assets(&asset_dir, Some(&db))?;
 
     asset_root_section
         .write(Path::new(&content_dir), Path::new(""), 0)

@@ -1,6 +1,9 @@
+use cratesio_dbdump_csvtab::CratesIODumpLoader;
 use reqwest::header::{ACCEPT, USER_AGENT};
 use serde::Deserialize;
 use std::{fs, path::PathBuf, str::FromStr};
+
+type CratesIoDb = cratesio_dbdump_csvtab::rusqlite::Connection;
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -48,7 +51,11 @@ impl AssetNode {
     }
 }
 
-fn visit_dirs(dir: PathBuf, section: &mut Section) -> anyhow::Result<()> {
+fn visit_dirs(
+    dir: PathBuf,
+    section: &mut Section,
+    crates_io_db: Option<&CratesIoDb>,
+) -> anyhow::Result<()> {
     if dir.is_dir() {
         let client = reqwest::blocking::Client::new();
         let github_token = std::env::var("GITHUB_TOKEN");
@@ -87,7 +94,7 @@ fn visit_dirs(dir: PathBuf, section: &mut Section) -> anyhow::Result<()> {
                     order,
                     sort_order_reversed,
                 };
-                visit_dirs(path.clone(), &mut new_section)?;
+                visit_dirs(path.clone(), &mut new_section, crates_io_db)?;
                 section.content.push(AssetNode::Section(new_section));
             } else {
                 if path.file_name().unwrap() == "_category.toml"
@@ -102,24 +109,26 @@ fn visit_dirs(dir: PathBuf, section: &mut Section) -> anyhow::Result<()> {
                 println!("Getting extra metadata for {}", asset.name);
 
                 let url = url::Url::parse(&asset.link)?;
+                let segments = url.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap();
                 match url.host_str() {
                     Some("github.com") => {
                         if let Ok(github_token) = &github_token {
-                            let segments =
-                                url.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap();
                             let username = segments[0];
                             let repository_name = segments[1];
                             get_metadata_from_github(
-                                username,
-                                repository_name,
                                 &mut asset,
                                 &client,
                                 github_token,
+                                username,
+                                repository_name,
                             )?;
                         }
                     }
                     Some("crates.io") => {
-                        // TODO get crates.io metadata from <https://github.com/alyti/cratesio-dbdump-lookup>
+                        if let Some(db) = crates_io_db {
+                            let crate_name = segments[1];
+                            get_metadata_from_crates_io_db(&mut asset, db, crate_name)?;
+                        }
                     }
                     _ => {}
                 }
@@ -131,7 +140,7 @@ fn visit_dirs(dir: PathBuf, section: &mut Section) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn parse_assets(asset_dir: &str) -> anyhow::Result<Section> {
+pub fn parse_assets(asset_dir: &str, crates_io_db: Option<&CratesIoDb>) -> anyhow::Result<Section> {
     let mut asset_root_section = Section {
         name: "Assets".to_string(),
         content: vec![],
@@ -143,16 +152,17 @@ pub fn parse_assets(asset_dir: &str) -> anyhow::Result<Section> {
     visit_dirs(
         PathBuf::from_str(asset_dir).unwrap(),
         &mut asset_root_section,
+        crates_io_db,
     )?;
     Ok(asset_root_section)
 }
 
 fn get_metadata_from_github(
-    username: &str,
-    repository_name: &str,
     asset: &mut Asset,
     client: &reqwest::blocking::Client,
     github_token: &str,
+    username: &str,
+    repository_name: &str,
 ) -> anyhow::Result<()> {
     let response = client
         .get(format!(
@@ -245,4 +255,34 @@ fn get_bevy_version(dep: &cargo_toml::Dependency) -> Option<String> {
             }
         }
     }
+}
+
+pub fn prepare_crates_db() -> anyhow::Result<CratesIoDb> {
+    Ok(CratesIODumpLoader::default()
+        .tables(&["crates", "dependencies", "versions"])
+        .preload(true)
+        .update()?
+        .open_db()?)
+}
+
+fn get_metadata_from_crates_io_db(
+    asset: &mut Asset,
+    db: &CratesIoDb,
+    crate_name: &str,
+) -> anyhow::Result<()> {
+    let rev_dependency = (cratesio_dbdump_lookup::get_rev_dependency(db, crate_name, "bevy")?)
+        .into_iter()
+        .flatten();
+    for (_, _, license, _, deps) in rev_dependency {
+        let licenses = license.split("OR").map(|x| x.trim().to_string()).collect();
+        asset.licenses = Some(licenses);
+
+        if let Ok(deps) = deps {
+            if let Some((version, _)) = deps.first() {
+                let version = version.clone().replace('^', "");
+                asset.bevy_versions = Some(vec![version]);
+            }
+        }
+    }
+    Ok(())
 }
