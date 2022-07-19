@@ -4,7 +4,7 @@ use generate_assets::*;
 
 fn main() -> Result<(), ()> {
     let asset_dir = std::env::args().nth(1).unwrap();
-    if let Ok(asset_root_section) = parse_assets(&asset_dir, None, None) {
+    if let Ok(asset_root_section) = parse_assets(&asset_dir, None, None, None) {
         if asset_root_section.validate() {
             Ok(())
         } else {

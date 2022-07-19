@@ -2,6 +2,8 @@ use anyhow::bail;
 use reqwest::header::{ACCEPT, USER_AGENT};
 use serde::Deserialize;
 
+const BASE_URL: &str = "https://api.github.com";
+
 pub struct GithubClient {
     client: reqwest::blocking::Client,
     token: String,
@@ -25,7 +27,7 @@ impl GithubClient {
         let response = self
             .client
             .get(format!(
-                "https://api.github.com/repos/{username}/{repository_name}/contents/{content_path}"
+                "{BASE_URL}/repos/{username}/{repository_name}/contents/{content_path}"
             ))
             .header(ACCEPT, "application/json")
             .header(USER_AGENT, "bevy-website-generate-assets")
@@ -55,7 +57,7 @@ impl GithubClient {
         let response = self
             .client
             .get(format!(
-                "https://api.github.com/repos/{username}/{repository_name}/license"
+                "{BASE_URL}/repos/{username}/{repository_name}/license"
             ))
             .header(ACCEPT, "application/json")
             .header(USER_AGENT, "bevy-website-generate-assets")

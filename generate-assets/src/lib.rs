@@ -1,10 +1,12 @@
 use anyhow::Context;
 use cratesio_dbdump_csvtab::CratesIODumpLoader;
 use github_client::GithubClient;
+use gitlab_client::GitlabClient;
 use serde::Deserialize;
 use std::{fs, path::PathBuf, str::FromStr};
 
 pub mod github_client;
+pub mod gitlab_client;
 
 type CratesIoDb = cratesio_dbdump_csvtab::rusqlite::Connection;
 
@@ -67,6 +69,7 @@ fn visit_dirs(
     section: &mut Section,
     crates_io_db: Option<&CratesIoDb>,
     github_client: Option<&GithubClient>,
+    gitlab_client: Option<&GitlabClient>,
 ) -> anyhow::Result<()> {
     if dir.is_dir() {
         for entry in fs::read_dir(dir)? {
@@ -103,7 +106,13 @@ fn visit_dirs(
                     order,
                     sort_order_reversed,
                 };
-                visit_dirs(path.clone(), &mut new_section, crates_io_db, github_client)?;
+                visit_dirs(
+                    path.clone(),
+                    &mut new_section,
+                    crates_io_db,
+                    github_client,
+                    gitlab_client,
+                )?;
                 section.content.push(AssetNode::Section(new_section));
             } else {
                 if path.file_name().unwrap() == "_category.toml"
@@ -115,7 +124,7 @@ fn visit_dirs(
                 let mut asset: Asset = toml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
                 asset.original_path = Some(path);
 
-                get_extra_metadata(&mut asset, crates_io_db, github_client)?;
+                get_extra_metadata(&mut asset, crates_io_db, github_client, gitlab_client)?;
 
                 section.content.push(AssetNode::Asset(asset));
             }
@@ -128,6 +137,7 @@ pub fn parse_assets(
     asset_dir: &str,
     crates_io_db: Option<&CratesIoDb>,
     github_client: Option<&GithubClient>,
+    gitlab_client: Option<&GitlabClient>,
 ) -> anyhow::Result<Section> {
     let mut asset_root_section = Section {
         name: "Assets".to_string(),
@@ -142,6 +152,7 @@ pub fn parse_assets(
         &mut asset_root_section,
         crates_io_db,
         github_client,
+        gitlab_client,
     )?;
     Ok(asset_root_section)
 }
@@ -151,6 +162,7 @@ fn get_extra_metadata(
     asset: &mut Asset,
     crates_io_db: Option<&CratesIoDb>,
     github_client: Option<&GithubClient>,
+    gitlab_client: Option<&GitlabClient>,
 ) -> anyhow::Result<()> {
     println!("Getting extra metadata for {}", asset.name);
 
@@ -186,7 +198,14 @@ fn get_extra_metadata(
             }
         }
         Some("gitlab.com") => {
-            // TODO
+            if let Some(client) = gitlab_client {
+                let repository_name = segments[1];
+
+                if let Err(err) = get_metadata_from_gitlab(asset, client, repository_name) {
+                    eprintln!("Failed to get metadata from gitlab for {}", asset.name);
+                    eprintln!("ERROR: {err}")
+                }
+            }
         }
         _ => {}
     }
@@ -212,6 +231,57 @@ fn get_metadata_from_github(
     } else {
         // If there's no license in the Cargo.toml, try to get it directly from the repo
         client.get_license(username, repository_name).ok()
+    };
+
+    if let Some(license) = license {
+        asset.set_license(&license);
+    }
+
+    // Find any dep that starts with bevy and get the version
+    // This makes sure to handle all the bevy_* crates
+    let version = cargo_manifest
+        .dependencies
+        .keys()
+        .find(|k| k.starts_with("bevy"))
+        .and_then(|key| {
+            cargo_manifest
+                .dependencies
+                .get(key)
+                .and_then(get_bevy_version)
+        });
+
+    if let Some(version) = version {
+        asset.bevy_versions = Some(vec![version]);
+    }
+
+    Ok(())
+}
+
+fn get_metadata_from_gitlab(
+    asset: &mut Asset,
+    client: &GitlabClient,
+    repository_name: &str,
+) -> anyhow::Result<()> {
+    let search_result = client.search_project_by_name(repository_name)?;
+
+    let repo = search_result
+        .first()
+        .context("Failed to find gitlab repo")?;
+
+    let content = client
+        .get_content(repo.id, &repo.default_branch, "Cargo.toml")
+        .context("Failed to get Cargo.toml from gitlab")?;
+
+    let cargo_manifest = toml::from_str::<cargo_toml::Manifest>(&content)?;
+
+    // Get the license from the package information
+    let license = if let Some(cargo_toml::Package { license, .. }) = &cargo_manifest.package {
+        license.clone()
+    } else {
+        // If there's no license in the Cargo.toml, try to get it directly from the repo
+        // TODO try to get license from crates.io otherwise
+        // try parsing the LICENSE file. The managed_license resource requires a gitlab ultimate license
+        None
     };
 
     if let Some(license) = license {

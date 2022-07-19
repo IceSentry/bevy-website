@@ -6,7 +6,7 @@ use std::{
     path::Path,
 };
 
-use generate_assets::{github_client::GithubClient, *};
+use generate_assets::{github_client::GithubClient, gitlab_client::GitlabClient, *};
 
 fn main() -> anyhow::Result<()> {
     let asset_dir = std::env::args().nth(1).unwrap();
@@ -23,8 +23,22 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
+    let gitlab_client = {
+        // This should already be configured in CI, but it's not mandatory if running locally
+        if let Ok(token) = std::env::var("GITLAB_TOKEN") {
+            Some(GitlabClient::new(token))
+        } else {
+            None
+        }
+    };
+
     let _ = fs::create_dir(content_dir.clone());
-    let asset_root_section = parse_assets(&asset_dir, Some(&db), github_client.as_ref())?;
+    let asset_root_section = parse_assets(
+        &asset_dir,
+        Some(&db),
+        github_client.as_ref(),
+        Some(GitlabClient::new(String::from(""))).as_ref(),
+    )?;
 
     asset_root_section
         .write(Path::new(&content_dir), Path::new(""), 0)
