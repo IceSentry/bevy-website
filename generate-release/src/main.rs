@@ -1,7 +1,9 @@
+use anyhow::Context;
 use changelog::generate_changelog;
 use clap::{Parser as ClapParser, Subcommand};
 use contributors::generate_contributors;
 use migration_guides::generate_migration_guides;
+use release_notes::generate_release_notes;
 use std::path::PathBuf;
 
 mod changelog;
@@ -10,6 +12,7 @@ mod github_client;
 mod helpers;
 mod markdown;
 mod migration_guides;
+mod release_notes;
 
 /// Generates markdown files used for a bevy releases.
 ///
@@ -17,6 +20,9 @@ mod migration_guides;
 ///
 /// Example used to generate the 0.14 release:
 /// cargo run -- --from v0.13.0 --to main --release-version 0.14 migration-guides
+/// cargo run -- --from v0.13.0 --to main --release-version 0.14 release-notes
+/// cargo run -- --from v0.13.0 --to main --release-version 0.14 changelog
+/// cargo run -- --from v0.13.0 --to main --release-version 0.14 contributors
 #[derive(ClapParser)]
 #[command(author, version, about, verbatim_doc_comment)]
 struct Args {
@@ -49,9 +55,17 @@ enum Commands {
         #[arg(short, long)]
         overwrite_existing: bool,
     },
+    ReleaseNotes {
+        /// Use this if you want to overwrite existing files
+        #[arg(short, long)]
+        overwrite_existing: bool,
+    },
     /// Generates a list of all the merged PRs for the given release
     Changelog,
     /// Generates the list of contributors
+    ///
+    /// This is very slow because it needs to make a network request for each commit
+    #[command(verbatim_doc_comment)]
     Contributors,
 }
 
@@ -69,11 +83,20 @@ fn main() -> anyhow::Result<()> {
         .join("release-content")
         .join(args.release_version);
 
+    std::fs::create_dir_all(&release_path).context("Creating the release-content path")?;
+
     match args.command {
         Commands::MigrationGuides { overwrite_existing } => generate_migration_guides(
             &args.from,
             &args.to,
             release_path.join("migration-guides"),
+            &client,
+            overwrite_existing,
+        )?,
+        Commands::ReleaseNotes { overwrite_existing } => generate_release_notes(
+            &args.from,
+            &args.to,
+            release_path.join("release-notes"),
             &client,
             overwrite_existing,
         )?,
