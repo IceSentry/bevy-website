@@ -1,0 +1,9 @@
+.contributors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+
+  padding: 0 !important;
+  margin: 32px 0;
+  list-style: none;
+}
