@@ -5,6 +5,6 @@ A huge thanks to the {{ data.contributors | length }} contributors that made thi
 
 <ul class="contributors">
 {% for contributor in data.contributors %}
-<li class="contributor__name">{{ contributor.name }}</li>
+<li class="contributors__name">{{ contributor.name }}</li>
 {% endfor %}
 </ul>
