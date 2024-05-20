@@ -100,7 +100,8 @@ fn get_prs_by_areas(
         // We want to check for PRs with the breaking label but without the guide section
         // to make it easier to track down missing guides
         if has_migration_guide_section || has_breaking_label {
-            let area = get_pr_area(pr);
+            let area = get_pr_area(pr).join(" + ");
+
             areas
                 .entry(area)
                 .or_default()
