@@ -27,18 +27,23 @@ pub fn generate_changelog(
     let mut areas_vec: Vec<_> = areas.into_iter().collect();
 
     // Move empty areas to the end
-    areas_vec.sort_by(|(a, _), (b, _)| {
-        match (a.is_empty(), b.is_empty()) {
-            (false, false) => a.join(" ").cmp(&b.join(" ")),
-            (false, true) => std::cmp::Ordering::Less,
-            (true, false) => std::cmp::Ordering::Greater,
-            (true, true) => std::cmp::Ordering::Equal,
-        }
+    areas_vec.sort_by(|(a, _), (b, _)| match (a.is_empty(), b.is_empty()) {
+        (false, false) => a.join(" ").cmp(&b.join(" ")),
+        (false, true) => std::cmp::Ordering::Less,
+        (true, false) => std::cmp::Ordering::Greater,
+        (true, true) => std::cmp::Ordering::Equal,
     });
 
     for (area, prs) in areas_vec {
         writeln!(output, "[[areas]]")?;
-        writeln!(output, "name = [{}]", area.iter().map(|a| format!("\"{}\"", a)).collect::<Vec<_>>().join(", "))?;
+        writeln!(
+            output,
+            "name = [{}]",
+            area.iter()
+                .map(|a| format!("\"{}\"", a))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )?;
 
         let mut prs = prs;
         prs.sort_by_key(|k| k.1.closed_at);
