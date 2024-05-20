@@ -14,9 +14,9 @@ For a complete list of changes, check out the PRs listed below.
 ### No area label
 {% endif %}
 
-<ul>
+<ul class="pr-list">
 {% for pr in area.prs %}
-<li><a href="https://github.com/bevyengine/bevy/pull/{{pr.number}}">{{pr.title | escape}}</a></li>
+<li class="pr-list__item"><a href="https://github.com/bevyengine/bevy/pull/{{pr.number}}">{{pr.title | markdown}}</a></li>
 {% endfor %}
 </ul>
 {% endfor %}
