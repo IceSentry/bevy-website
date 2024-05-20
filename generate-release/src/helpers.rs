@@ -83,7 +83,7 @@ pub fn get_pr_area(pr: &GithubIssuesResponse) -> Vec<String> {
         .map(|l| l.replace("A-", ""))
         .collect();
 
-    areas.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+    areas.sort_by_key(|a| a.to_lowercase());
 
     areas
 }

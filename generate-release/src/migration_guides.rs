@@ -7,6 +7,8 @@ use crate::{
 };
 use std::{collections::BTreeMap, io::Write as IoWrite, path::PathBuf};
 
+type PrsByAreaBTreeMap = BTreeMap<Vec<String>, Vec<(String, GithubIssuesResponse)>>;
+
 pub fn generate_migration_guides(
     from: &str,
     to: &str,
@@ -76,8 +78,8 @@ fn get_prs_by_areas(
     client: &GithubClient,
     from: &str,
     to: &str,
-) -> Result<BTreeMap<Vec<String>, Vec<(String, GithubIssuesResponse)>>, anyhow::Error> {
-    let mut areas = BTreeMap::<Vec<String>, Vec<(String, GithubIssuesResponse)>>::new();
+) -> Result<PrsByAreaBTreeMap, anyhow::Error> {
+    let mut areas: PrsByAreaBTreeMap = BTreeMap::new();
 
     let merged_prs = get_merged_prs(client, from, to, None)?;
     let mut count = 0;
@@ -114,7 +116,7 @@ fn get_prs_by_areas(
 fn generate_metadata_block(
     title: &String,
     file_name: &String,
-    areas: &Vec<String>,
+    areas: &[String],
     pr_number: i32,
 ) -> String {
     format!(

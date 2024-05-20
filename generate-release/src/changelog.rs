@@ -50,13 +50,13 @@ pub fn generate_changelog(
 
         for (title, pr) in prs {
             writeln!(output, "[[areas.prs]]")?;
-            writeln!(output, "title = \"{}\"", title.trim().replace("\"", "\\\""))?;
+            writeln!(output, "title = \"{}\"", title.trim().replace('"', "\\\""))?;
             writeln!(output, "number = {}", pr.number)?;
 
             count += 1;
         }
 
-        writeln!(output, "")?;
+        writeln!(output)?;
     }
 
     println!("\nAdded {count} PRs to the changelog");
