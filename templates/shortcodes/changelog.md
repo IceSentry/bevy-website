@@ -7,7 +7,12 @@ Innumerable bug fixes, documentation changes and API usability tweaks made it in
 For a complete list of changes, check out the PRs listed below.
 
 {% for area in data.areas %}
+{% set area_name_length = area.name | length %}
+{% if area_name_length > 0 %}
 ### {{ area.name | join(sep=" + ") }}
+{% else %}
+### No area label
+{% endif %}
 
 <ul>
 {% for pr in area.prs %}
