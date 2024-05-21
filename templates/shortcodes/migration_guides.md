@@ -3,6 +3,10 @@
 {% set base_path = macros::release_path(version=version, path="/migration-guides/") %}
 {% set guides_data = load_data(path=macros::path_join(path_a=base_path, path_b="/_guides.toml")) %}
 
+<aside class="callout callout--warning">
+  <p>Bevy relies heavily on improvements in the Rust language and compiler. As a result, the Minimum Supported Rust Version (MSRV) is "the latest stable release" of Rust.</p>
+</aside>
+
 <div class="migration-guide">
 {% for guide in guides_data.guides %}
 {% set guide_body = load_data(path=macros::path_join(path_a=base_path, path_b=guide.file_name)) %}

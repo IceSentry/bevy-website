@@ -43,10 +43,6 @@ weight = 9
 long_title = "Migration Guide: 0.13 to 0.14"
 +++
 
-{% callout(type="warning") %}
-    Bevy relies heavily on improvements in the Rust language and compiler. As a result, the Minimum Supported Rust Version (MSRV) is "the latest stable release" of Rust.
-{% end %}
-
 {{ migration_guides(version="0.14") }}
 ```
 
